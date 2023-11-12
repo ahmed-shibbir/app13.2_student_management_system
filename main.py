@@ -8,6 +8,13 @@ import sys
 import sqlite3
 
 
+class DatabaseConnection:
+    def __init__(self, database_file = "database.db"):
+        self.database_file = database_file
+
+    def connect(self):
+        connection = sqlite3.connect(self.database_file)
+        return connection
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -74,16 +81,11 @@ class MainWindow(QMainWindow):
     def cell_clicked(self):
         edit_button = QPushButton("Edit Record")
         # Establish connection to edit dialog box
-        edit_button.clicked.connect(
-            self.edit)  # Once edit button is clicked, edit method is executed-which is linked to EditDialog class
-
+        edit_button.clicked.connect(self.edit)  # Once edit button is clicked, edit method is executed-which is linked to EditDialog class
 
         delete_button = QPushButton("Delete Record")
         # Establish connection to delete dialog box
-        delete_button.clicked.connect(
-            self.delete)  # Once delete button is clicked, delete method is executed-which is linked to DeleteDialog class
-
-
+        delete_button.clicked.connect(self.delete)  # Once delete button is clicked, delete method is executed-which is linked to DeleteDialog class
         # Removes duplicate buttons/widgets from the status bar. In the absence of this code, Edit Record and
         # Delete Record buttons get accumulated instead of just having two buttons
         children = self.findChildren(QPushButton)
@@ -99,15 +101,15 @@ class MainWindow(QMainWindow):
 
     # Loading data from database table and populate the table that was created in the above stage
     def load_data(self):
-        connection = sqlite3.connect("database.db")
-        data = connection.execute("SELECT * FROM students")
-        # print(list(data))
+        connection = DatabaseConnection().connect()  # sqlite3.connect("database.db")
+        data = connection.execute("SELECT * FROM students") # When printed as a list, Returns a list of row tuples (without column header-which is defined in the main window class, without row number-just id is there)
+        # print(list(data)) # a list of row tuples
         self.table.setRowCount(0)  # It resets the table and load data as fresh to avoid duplicate data.
-        for row_number, row_data in enumerate(data):
+        for row_number, row_data in enumerate(data):  # Breaks into the list of row tuples, row number is generated on enumeration, data doesn't have row number. As list has tuples, it is asumed to have row numbers for each tuple
             # print(row_number)
             # print(row_data)
-            self.table.insertRow(row_number)
-            for column_number, cell_data in enumerate(row_data):
+            self.table.insertRow(row_number) # Row is created in the main window table
+            for column_number, cell_data in enumerate(row_data): # Breaks into the each tuple in the list, Column number is generated on enumeration, it is not in the row_data. As tuple has only one row, it is asumed to have column number.
                 # print(column_number)
                 # print(cell_data)
                 self.table.setItem(row_number, column_number, QTableWidgetItem(str(cell_data)))
@@ -152,8 +154,8 @@ class AboutDialog(QMessageBox):
         self.setText(content)
 
 
-class EditDialog(QDialog): # THIS CLASS HAS 3 MAIN STEPS:-
-    def __init__(self):  # STEP 1. This method initialises variables and selects data from main window table and place them into the edit dialog box
+class EditDialog(QDialog): # THIS CLASS HAS 3 MAIN STEPS(1ST AND 2ND STEPS ARE FUNDAMENTAL PARTS OF A CLASS):-
+    def __init__(self):  # STEP 1. INPUT GENERATION: This method initialises variables and selects data from main window table and place them into the edit dialog box
         super().__init__()
         self.setWindowTitle("Update Student Data")
         self.setFixedWidth(300)
@@ -203,8 +205,8 @@ class EditDialog(QDialog): # THIS CLASS HAS 3 MAIN STEPS:-
 
         self.setLayout(layout)
 
-    def update_student(self):  # STEP 2. This method updates database
-        connection = sqlite3.connect("database.db")
+    def update_student(self):  # STEP 2. INPUT PROCESSING AND DELIVERING OUTPUT: This method updates database
+        connection = DatabaseConnection().connect()  # sqlite3.connect("database.db")
         cursor = connection.cursor()
         cursor.execute("UPDATE students SET name = ?, course = ?, mobile = ? WHERE id = ?",
                        (self.student_name.text(),
@@ -237,20 +239,27 @@ class DeleteDialog(QDialog):
         layout.addWidget(no, 1, 1)
         self.setLayout(layout)
 
+        index = main_window.table.currentRow()  # Returns number (selected row number) only.(Row number begins with 0,                            # while student id begins with 1)
+        print("delete index:", index)
+        self.student_id = main_window.table.item(index, 0).text()  # Returns number (selected student id number) only.
+        print("student id:", self.student_id)
+
         yes.clicked.connect(self.delete_student) # Method for yes button defined, not for no button.
 
     def delete_student(self): # 3 main steps:-
         # 1. Get student id of selected row by first getting the index from main window table
-        index = main_window.table.currentRow()  # Returns number (selected row number) only.(Row number begins with 0,
-                                                # while student id begins with 1)
-        print("delete index:", index)
 
-        student_id = main_window.table.item(index, 0).text()  # Returns number (selected student id number) only.
-        print("student id:", student_id)
+        ## MOVED TO CLASS ##################################################################
+        # index = main_window.table.currentRow()  # Returns number (selected row number) only.(Row number begins with 0,
+        #                                         # while student id begins with 1)
+        # print("delete index:", index)
+        # student_id = main_window.table.item(index, 0).text()  # Returns number (selected student id number) only.
+        # print("student id:", student_id)
+        #####################################################################################
 
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect()  # sqlite3.connect("database.db")
         cursor = connection.cursor()
-        cursor.execute("DELETE from students WHERE id = ?", (student_id,))  # 2. delete the row from database
+        cursor.execute("DELETE from students WHERE id = ?", (self.student_id,))  # 2. delete the row from database
         connection.commit()
         cursor.close()
         connection.close()
@@ -310,7 +319,7 @@ class InsertDialog(QDialog):  # 1. Create Dialog box with empty fields where you
         name = self.student_name.text()
         course = self.course_name.itemText(self.course_name.currentIndex())
         mobile = self.mobile.text()
-        connection = sqlite3.connect("database.db")
+        connection = DatabaseConnection().connect() # sqlite3.connect("database.db")
         cursor = connection.cursor()
         cursor.execute("INSERT INTO students (name, course, mobile) VALUES (?, ?, ?)",
                        (name, course, mobile))
